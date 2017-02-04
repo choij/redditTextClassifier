@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import vstack
 
 def fit_nb(x, y, cols=None):
     if cols is None: cols = np.arange(x.shape[1])
@@ -17,23 +18,22 @@ def fit_nb(x, y, cols=None):
         else:
             classes[y_i] = 1
             counts[y_i] = x[i]
-        print(x[i].shape)
 
-    class_names = sorted(classes.keys())
-    b = np.array([classes[y_i] for y_i in class_names])/n
+    class_names = np.array(sorted(classes.keys()))
+    b = (np.array([classes[y_i] for y_i in class_names])/n)
     
-    counts = np.array([counts[y_i] for y_i in class_names])
-    print(counts.shape)
-    0/0
-    total_counts = np.sum(counts, axis=1)[np.newaxis].T
-    w = (counts + 1)/(total_counts + alpha)
+    counts = vstack([counts[y_i] for y_i in class_names]).todense()
 
+    total_counts = np.sum(counts, axis=1)
+    w = (counts + 1)/(total_counts + alpha).A
 
     def predict(x):
-        if len(cols) < len(x[0]):
+        if len(cols) < x.shape[1]:
             x = x[:, cols]
-        indices = np.argmax(b + np.dot(x, w.T))
-        predictions = np.array([class_names[i] for i in indices])[newaxis].T
+        x = x.todense().A
 
-# fit_cols_nb = lambda cols: partial(fit_nb, cols=cols)
+        indices = np.argmax(b + np.dot(x, w.T), axis=1).A1
+        return class_names[indices].reshape(-1,1)
+
+    return predict
 

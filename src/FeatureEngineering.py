@@ -51,6 +51,9 @@ if __name__ == '__main__':
 
     from naive_bayes import fit_nb
 
-    print(y_mat)
-    print(fit_nb(x_mat, y_mat))
+    fitted = fit_nb(x_mat, y_mat)
+    y_hat = fitted(x_mat)
+    acc = sum(y_hat == y_mat)/len(y_hat)
+    print("Accuracy on training set: {}".format(acc))
+
 
