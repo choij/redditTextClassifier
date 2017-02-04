@@ -1,5 +1,10 @@
 import multiprocessing
+import os
 import time
+
+def find_project_dir():
+    curr_path, _ = os.path.split(os.path.realpath(__file__))
+    return os.path.join(curr_path, "..")
 
 def timeit(f, s):
     """
