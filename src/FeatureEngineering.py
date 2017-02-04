@@ -1,11 +1,16 @@
 import pandas as pd
 import numpy as np
+import os
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from tools import find_project_dir
 
 class FeatureEngineering:
+    def __init__(self):
+        self.dir = lambda path: os.path.join(find_project_dir(), path)
+
     def read_x_train_features(self):
-        df = pd.read_csv("data/train_input.csv")
+        df = pd.read_csv(self.dir("data/train_input.csv"))
         df = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
         df = df.head(10)
 
@@ -33,7 +38,7 @@ class FeatureEngineering:
         return tfidf_matrix
 
     def read_y_train_features(self):
-        df = pd.read_csv("data/train_output.csv")
+        df = pd.read_csv(self.dir("data/train_output.csv"))
         df = df.drop('id', axis=1)
         df = df.head(10)
         y_train = df.as_matrix()
@@ -48,12 +53,5 @@ if __name__ == '__main__':
     y_mat = fe.read_y_train_features()
     x_mat = fe.calc_count_matrix(x_df)
     x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
-
-    from naive_bayes import fit_nb
-
-    fitted = fit_nb(x_mat, y_mat)
-    y_hat = fitted(x_mat)
-    acc = sum(y_hat == y_mat)/len(y_hat)
-    print("Accuracy on training set: {}".format(acc))
 
 
