@@ -11,17 +11,18 @@ from tools import parmap, timeit
 def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metrics=None):
     """
     Input:
-        x - pandas DataFrame with samples as rows and features as columns.
-        y - pandas DataFrame column with value (i) corresponding to the
+        x - numpy (n, m) ndarray with samples as rows and features as columns.
+        y - numpy column ndarray with value (i) corresponding to the
             sample (i) in x.
         loss_fun - function taking two vertical numpy arrays and returning
-            a float loss.
+            a vertical numpy ndarray of elementwise loss.
         models - list of model fitting procedures taking similarly shaped
             x, y, and loss function. Each procedure returns a function
-            'fit': (n, #features) pandas DataFrame -> (n, 1) np array
+            'fit': (n, m) numpy ndarray of data "X" -> (n, 1) np array
+                "predictions"
         num_samples - number of bootstrap samples
-        binary_outcome - True if y is binary. Extremely significantly peeds up
-            the bootstrap error calculation.
+        binary_outcome - True if y is binary. Extremely significantly speeds
+            up the bootstrap error calculation.
 
     Output:
         err - list with a ".632+ bootstrap error" as described by
@@ -34,9 +35,10 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
         fitting procedure.
 
         Input:
-            fit_model - function that takes pandas Dataframe x, pandas 
-                Dataframe  y, and loss_fun and returns a function that takes
-                pandas DataFrame x and returns np array of predictions y
+            fit_model - function that takes numpy ndarray x, numpy
+                column ndarray y, and loss_fun and returns a function
+                'fit': (n, m) numpy ndarray of data "X" -> (n, 1) np array
+                "predictions"
 
         Output:
             bootstrap_error - float ".632+ bootstrap error"
