@@ -49,3 +49,8 @@ if __name__ == '__main__':
     x_mat = fe.calc_count_matrix(x_df)
     x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
+    from naive_bayes import fit_nb
+
+    print(y_mat)
+    print(fit_nb(x_mat, y_mat))
+
