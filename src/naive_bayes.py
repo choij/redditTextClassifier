@@ -1,39 +1,42 @@
 import numpy as np
 from scipy.sparse import vstack
 
-def fit_nb(x, y, cols=None):
-    if cols is None: cols = np.arange(x.shape[1])
-    x = x[:,cols]
+class NaiveBayes():
 
-    alpha = len(cols)
-    n = len(y)
+    def __init__(self):
+        self.priors = None
 
-    classes = {}
-    counts = {}
-    for i in range(n):
-        y_i = y[i][0]
-        if y_i in classes.keys():
-            classes[y_i] += 1
-            counts[y_i] += x[i]
-        else:
-            classes[y_i] = 1
-            counts[y_i] = x[i]
+    def fit(self, x, y):
+        _, alpha = x.shape
+        n = len(y)
 
-    class_names = np.array(sorted(classes.keys()))
-    b = (np.array([classes[y_i] for y_i in class_names])/n)
-    
-    counts = vstack([counts[y_i] for y_i in class_names]).todense()
+        classes = {}
+        counts = {}
+        for i in range(n):
+            y_i = y[i][0]
+            if y_i in classes.keys():
+                classes[y_i] += 1
+                counts[y_i] += x[i]
+            else:
+                classes[y_i] = 1
+                counts[y_i] = x[i]
 
-    total_counts = np.sum(counts, axis=1)
-    w = (counts + 1)/(total_counts + alpha).A
+        self.class_names = np.array(sorted(classes.keys()))
+        self.priors = (np.array([classes[y_i] for y_i in self.class_names])/n)
+        
+        counts = vstack([counts[y_i] for y_i in self.class_names]).todense()
 
-    def predict(x):
-        if len(cols) < x.shape[1]:
-            x = x[:, cols]
+        total_counts = np.sum(counts, axis=1)
+        self.w = (counts + 1)/(total_counts + alpha)
+
+    def predict(self, x):
+        try:
+            self.priors
+        except e:
+            return "Run NaiveBayes.fit() before predicting."
+
         x = x.todense().A
+        indices = np.argmax(self.priors + np.dot(x, self.w.T), axis=1).A1
+        return self.class_names[indices].reshape(-1,1)
 
-        indices = np.argmax(b + np.dot(x, w.T), axis=1).A1
-        return class_names[indices].reshape(-1,1)
-
-    return predict
 
