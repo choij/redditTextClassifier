@@ -12,7 +12,6 @@ class FeatureEngineering:
     def read_x_train_features(self):
         df = pd.read_csv(self.dir("data/train_input.csv"))
         df = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
-        df = df.head(10)
 
         return df
 
@@ -40,7 +39,6 @@ class FeatureEngineering:
     def read_y_train_features(self):
         df = pd.read_csv(self.dir("data/train_output.csv"))
         df = df.drop('id', axis=1)
-        df = df.head(10)
         y_train = df.as_matrix()
         return y_train
 
