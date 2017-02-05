@@ -77,7 +77,7 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics
 
             return np.concatenate([in_test_set, loss])
 
-        n = len(x)
+        n, _ = x.shape
         q = math.pow(1 - 1/n, n)
         p = 1 - q
 
@@ -85,7 +85,7 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics
 
         all_samples = reduce(operator.add, 
                              parmap(time_sample, range(num_samples)))
-                             # map(time_sample, range(num_samples)))
+                             
         in_test_set, loss = np.split(all_samples, 2)
 
         full = model()
@@ -105,13 +105,13 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics
 
         if categorical:
             orig_prop = full.priors
-            y_p = np.sort(np.vstack((y_hat, full.class_names)), axis=0)
-            i_count = np.asarray(np.unique(y_hat, return_counts=True)).T
-            counts = sum(np.split(i_count, axis=1)[1].T) - 1
+            y_au = np.sort(np.vstack((y_hat, full.class_names.reshape(-1,1))))
+            i_count = np.asarray(np.unique(y_au, return_counts=True)).T
+            counts = np.split(i_count, 2, axis=1)[1].flatten().astype(int) - 1
             obs_prop = counts/counts.sum()
 
-            print(orig_prop)
-            print(obs_prop)
+            print(orig_prop, orig_prop.sum())
+            print(obs_prop, orig_prop.sum())
 
             gamma = sum(orig_prop * (1 - obs_prop))
 
@@ -130,4 +130,4 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics
         return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
 
     timed_model = lambda model: timeit(lambda: boot_error(model), "model")
-    return np.array(parmap(timed_model, models))
+    return list(map(timed_model, models))
