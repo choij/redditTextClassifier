@@ -8,7 +8,7 @@ from functools import reduce, partial
 
 from tools import parmap, timeit
 
-def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metrics=None):
+def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics=None):
     """
     Input:
         x - numpy (n, m) ndarray with samples as rows and features as columns.
@@ -16,26 +16,25 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
             sample (i) in x.
         loss_fun - function taking two vertical numpy arrays and returning
             a vertical numpy ndarray of elementwise loss.
-        models - list of model fitting procedures taking similarly shaped
-            x, y, and loss function. Each procedure returns a function
-            'fit': (n, m) numpy ndarray of data "X" -> (n, 1) np array
-                "predictions"
+        models - list of model objects with 'fit' methods taking similarly 
+            shaped x and y. Each procedure has a 'predict' method that takes 
+            another x and returns a vector y.
         num_samples - number of bootstrap samples
-        binary_outcome - True if y is binary. Extremely significantly speeds
-            up the bootstrap error calculation.
+        catigorical - True if y is categorical. Extremely significant 
+            speed-up for the bootstrap error calculation.
 
     Output:
         err - list with a ".632+ bootstrap error" as described by
             Efron, Tibshirani 1997
     """
 
-    def boot_error(fit_model):
+    def boot_error(model):
         """
         Finds the bootstrap error based on the given data and the model
         fitting procedure.
 
         Input:
-            fit_model - function that takes numpy ndarray x, numpy
+            model - object with a function that takes numpy ndarray x, numpy
                 column ndarray y, and loss_fun and returns a function
                 'fit': (n, m) numpy ndarray of data "X" -> (n, 1) np array
                 "predictions"
@@ -59,19 +58,20 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
             in_test_set = np.zeros(n)
             loss = np.zeros(n)
 
-            fit = 0
-            while not fit:
+            mod = 0
+            while not mod:
                 try:
                     train = np.random.choice(n, n)
                     test = np.setdiff1d(np.arange(n), train)
 
-                    fit = fit_model(x[train], y[train])
+                    mod = model()
+                    mod.fit(x[train], y[train])
                 except np.linalg.linalg.LinAlgError as e:
                     print("lin_alg_error")
                     pass
 
             in_test_set[test] = 1
-            y_hat = fit(x[test])
+            y_hat = mod.predict(x[test])
 
             loss[test] = loss_fun(y_hat, y[test])
 
@@ -88,8 +88,9 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
                              # map(time_sample, range(num_samples)))
         in_test_set, loss = np.split(all_samples, 2)
 
-        fit = timeit(lambda:fit_model(x, y), "fitting overall model")
-        y_hat = fit(x)
+        full = model()
+        timeit(lambda:full.fit(x, y), "fitting overall model")
+        y_hat = full.predict(x)
         if metrics is not None: metrics(y_hat, y)
 
         if any(in_test_set == 0):
@@ -102,10 +103,18 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
         err_bar = np.mean(loss_fun(y_hat, y))
         err_632 = q * err_bar + p * err_1
 
-        if binary_outcome:
-            p1 = sum(map(lambda t: t == 1, y))/n
-            q1 = sum(map(lambda t: t == 1, y_hat))/n
-            gamma = p1 * (1 - q1) + q1 * (1 - p1)
+        if categorical:
+            orig_prop = full.priors
+            y_p = np.sort(np.vstack((y_hat, full.class_names)), axis=0)
+            i_count = np.asarray(np.unique(y_hat, return_counts=True)).T
+            counts = sum(np.split(i_count, axis=1)[1].T) - 1
+            obs_prop = counts/counts.sum()
+
+            print(orig_prop)
+            print(obs_prop)
+
+            gamma = sum(orig_prop * (1 - obs_prop))
+
         else:
             # gamma = err_bar
             unary_loss = lambda a: loss_fun(*a)
@@ -121,5 +130,4 @@ def bootstrap(x, y, loss_fun, models, num_samples=200, binary_outcome=True, metr
         return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
 
     timed_model = lambda model: timeit(lambda: boot_error(model), "model")
-    # return np.array(parmap(timed_model, models))
-    return list(map(timed_model, models))
+    return np.array(parmap(timed_model, models))
