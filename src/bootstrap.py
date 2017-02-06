@@ -5,129 +5,145 @@ import numpy as np
 import itertools
 
 from functools import reduce, partial
-
+from metrics import CategoricalMetric
 from tools import parmap, timeit
 
-def bootstrap(x, y, loss_fun, models, num_samples=200, categorical=True, metrics=None):
-    """
-    Input:
-        x - numpy (n, m) ndarray with samples as rows and features as columns.
-        y - numpy column ndarray with value (i) corresponding to the
-            sample (i) in x.
-        loss_fun - function taking two vertical numpy arrays and returning
-            a vertical numpy ndarray of elementwise loss.
-        models - list of model objects with 'fit' methods taking similarly 
-            shaped x and y. Each procedure has a 'predict' method that takes 
-            another x and returns a vector y.
-        num_samples - number of bootstrap samples
-        catigorical - True if y is categorical. Extremely significant 
-            speed-up for the bootstrap error calculation.
+class Bootstrap:
 
-    Output:
-        err - list with a ".632+ bootstrap error" as described by
-            Efron, Tibshirani 1997
-    """
+    def __init__(self, x, y, loss_fun, models, num_samples=200, categorical=True, metric=CategoricalMetric):
+        self.x = x
+        self.y = y
+        self.loss_fun = loss_fun
+        self.models = models
+        self.num_samples = num_samples
+        self.categorical = categorical
 
-    def boot_error(model):
+        self.n, _ = x.shape
+        self.estimates = []
+
+    def _one_sample(self, model):
         """
-        Finds the bootstrap error based on the given data and the model
-        fitting procedure.
-
-        Input:
-            model - object with a function that takes numpy ndarray x, numpy
-                column ndarray y, and loss_fun and returns a function
-                'fit': (n, m) numpy ndarray of data "X" -> (n, 1) np array
-                "predictions"
+        Helper function for error. Samples from the data, fits a model,
+        and finds the loss on the outsample.
 
         Output:
-            bootstrap_error - float ".632+ bootstrap error"
+            in_test_set - a 1D binary array with 1s indicating the 
+                presence of observation (i) in the test set.
+
+            loss - a 1D array of the loss for observation (i), equal to 0 
+                if (i) was not in the test set.
+        """
+        in_test_set = np.zeros(self.n)
+        loss = np.zeros(self.n)
+
+        model.unfit()
+        while not model.is_fitted():
+            try:
+                train = np.random.choice(self.n, self.n)
+                test = np.setdiff1d(np.arange(self.n), train)
+
+                model.fit(self.x[train], self.y[train])
+            except np.linalg.linalg.LinAlgError as e:
+                print("lin_alg_error")
+                pass
+
+        in_test_set[test] = 1
+        y_hat = model.predict(self.x[test])
+        model.update_metrics(y_hat, self.y[test])
+
+        loss[test] = self.loss_fun(y_hat, self.y[test])
+
+        return np.concatenate([in_test_set, loss])
+
+    def run_samples(self, model):
+        one_sample = partial(self._one_sample, model=model)
+        time_sample = lambda x: timeit(lambda: one_sample(), "Running sample")
+
+        all_samples = parmap(time_sample, range(self.num_samples))
+        # all_samples = list(map(time_sample, range(self.num_samples)))
+
+        return np.split(reduce(operator.add, all_samples), 2)
+                                 
+    def run(self):
+        """
+        Input:
+            x - numpy (n, m) ndarray with samples as rows and features as 
+                columns.
+            y - numpy column ndarray with value (i) corresponding to the
+                sample (i) in x.
+            loss_fun - function taking two vertical numpy arrays and returning
+                a vertical numpy ndarray of elementwise loss.
+            models - list of model objects with 'fit' methods taking 
+                similarly shaped x and y. Each procedure has a 'predict'
+                method that takes 
+                another x and returns a vector y.
+            num_samples - number of bootstrap samples
+            catigorical - True if y is categorical. Extremely significant 
+                speed-up for the bootstrap error calculation.
+
+        Output:
+            err - list with a ".632+ bootstrap error" as described by
+                Efron, Tibshirani 1997
         """
 
-        def one_sample(n):
+        def boot_error(model):
             """
-            Helper function for error. Samples from the data, fits a model,
-            and finds the loss on the outsample.
+            Finds the bootstrap error based on the given data and the model
+            fitting procedure.
+
+            Input:
+                model - object with a function that takes numpy ndarray x, 
+                    numpy column ndarray y, and loss_fun and returns a 
+                    function 'fit': (n, m) numpy ndarray of data 
+                    "X" -> (n, 1) np array "predictions"
 
             Output:
-                in_test_set - a 1D binary array with 1s indicating the 
-                    presence of observation (i) in the test set.
-
-                loss - a 1D array of the loss for observation (i), equal to 0 
-                    if (i) was not in the test set.
+                bootstrap_error - float ".632+ bootstrap error"
             """
-            in_test_set = np.zeros(n)
-            loss = np.zeros(n)
 
-            mod = 0
-            while not mod:
-                try:
-                    train = np.random.choice(n, n)
-                    test = np.setdiff1d(np.arange(n), train)
+            q = math.pow(1 - 1/self.n, self.n)
+            p = 1 - q
 
-                    mod = model()
-                    mod.fit(x[train], y[train])
-                except np.linalg.linalg.LinAlgError as e:
-                    print("lin_alg_error")
-                    pass
+            in_test_set, loss = self.run_samples(model)
+            
+            timeit(lambda:model.fit(self.x, self.y), "Fitting overall model")
+            y_hat = model.predict(self.x)
 
-            in_test_set[test] = 1
-            y_hat = mod.predict(x[test])
+            if any(in_test_set == 0):
+                i_in_test_set = lambda i: in_test_set[i] != 0
+                good_indices = list(filter(i_in_test_set, range(self.n)))
+                loss = loss[good_indices]
+                in_test_set = in_test_set[good_indices]
 
-            loss[test] = loss_fun(y_hat, y[test])
+            err_1 = np.mean(loss/in_test_set)
+            err_bar = np.mean(self.loss_fun(y_hat, self.y))
+            err_632 = q * err_bar + p * err_1
 
-            return np.concatenate([in_test_set, loss])
+            if self.categorical:
+                orig_prop = model.priors
+                vert_names = model.class_names.reshape(-1,1)
+                y_au = np.sort(np.vstack((y_hat, vert_names)))
+                i_count = np.asarray(np.unique(y_au, return_counts=True)).T
+                counts = np.split(i_count, 2, axis=1)[1].flatten().astype(int)
+                counts -= 1 # remove effect of adding all class names
+                obs_prop = counts/counts.sum()
 
-        n, _ = x.shape
-        q = math.pow(1 - 1/n, n)
-        p = 1 - q
+                gamma = (orig_prop * (1 - obs_prop)).sum()
 
-        time_sample = lambda x: timeit(lambda:one_sample(n), "Running sample")
+            else:
+                # gamma = err_bar
+                unary_loss = lambda a: self.loss_fun(*a)
+                all_pairs = itertools.product(y_hat, self.y)
+                loss_vector = map(unary_loss, all_pairs)
+                gamma = sum(loss_vector)/self.n/self.n
+            
+            if err_1 > err_bar and gamma > err_bar:
+                r = (err_1 - err_bar)/(gamma - err_bar)
+            else:
+                r = 0
 
-        all_samples = reduce(operator.add, 
-                             parmap(time_sample, range(num_samples)))
-                             
-        in_test_set, loss = np.split(all_samples, 2)
+            err1_ = min(err_1, gamma)
+            return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
 
-        full = model()
-        timeit(lambda:full.fit(x, y), "fitting overall model")
-        y_hat = full.predict(x)
-        if metrics is not None: metrics(y_hat, y)
-
-        if any(in_test_set == 0):
-            i_in_test_set = lambda i: in_test_set[i] != 0
-            good_indices = list(filter(i_in_test_set, range(n)))
-            loss = loss[good_indices]
-            in_test_set = in_test_set[good_indices]
-
-        err_1 = np.mean(loss/in_test_set)
-        err_bar = np.mean(loss_fun(y_hat, y))
-        err_632 = q * err_bar + p * err_1
-
-        if categorical:
-            orig_prop = full.priors
-            y_au = np.sort(np.vstack((y_hat, full.class_names.reshape(-1,1))))
-            i_count = np.asarray(np.unique(y_au, return_counts=True)).T
-            counts = np.split(i_count, 2, axis=1)[1].flatten().astype(int) - 1
-            obs_prop = counts/counts.sum()
-
-            print(orig_prop, orig_prop.sum())
-            print(obs_prop, orig_prop.sum())
-
-            gamma = sum(orig_prop * (1 - obs_prop))
-
-        else:
-            # gamma = err_bar
-            unary_loss = lambda a: loss_fun(*a)
-            loss_vector = map(unary_loss, itertools.product(y_hat, y))
-            gamma = sum(loss_vector)/n/n
-        
-        if err_1 > err_bar and gamma > err_bar:
-            r = (err_1 - err_bar)/(gamma - err_bar)
-        else:
-            r = 0
-
-        err1_ = min(err_1, gamma)
-        return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
-
-    timed_model = lambda model: timeit(lambda: boot_error(model), "model")
-    return list(map(timed_model, models))
+        timed_model = lambda model: timeit(lambda: boot_error(model), "Running model")
+        self.estimates = list(map(timed_model, self.models))
