@@ -2,6 +2,14 @@ import multiprocessing
 import os
 import time
 
+def update_moving_average(mean, new_val, n):
+    if n == None:
+        return new_val
+    mean *=  n
+    mean += new_val
+    mean /= n + 1
+    return mean
+
 def find_project_dir():
     curr_path, _ = os.path.split(os.path.realpath(__file__))
     return os.path.join(curr_path, "..")

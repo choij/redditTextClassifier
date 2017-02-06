@@ -1,10 +1,29 @@
 import numpy as np
 from scipy.sparse import vstack
 
+from metrics import CategoricalMetric
+
 class NaiveBayes():
 
     def __init__(self):
         self.priors = None
+        self.fitted = False
+        self.metrics = CategoricalMetric()
+
+    def is_fitted(self):
+        return self.fitted
+
+    def unfit(self):
+        self.priors = None
+        self.w = None
+        self.fitted = False
+        self.class_names = None
+
+    def update_metrics(self, y_hat, y_test):
+        self.metrics.update(y_hat, y_test)
+
+    def print_metrics(self):
+        self.metrics.print()
 
     def fit(self, x, y):
         _, alpha = x.shape
@@ -28,11 +47,10 @@ class NaiveBayes():
 
         total_counts = np.sum(counts, axis=1)
         self.w = (counts + 1)/(total_counts + alpha)
+        self.fitted = True
 
     def predict(self, x):
-        try:
-            self.priors
-        except e:
+        if not self.fitted:
             return "Run NaiveBayes.fit() before predicting."
 
         x = x.todense().A
