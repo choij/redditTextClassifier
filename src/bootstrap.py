@@ -21,6 +21,11 @@ class Bootstrap:
         self.n, _ = x.shape
         self.estimates = []
 
+    def print_summary(self):
+        for i in range(len(self.models)):
+            self.models[i].print_metrics()
+            print("Error estimate: {}".format(self.estimates[i]))
+
     def _one_sample(self, model):
         """
         Helper function for error. Samples from the data, fits a model,
@@ -59,11 +64,11 @@ class Bootstrap:
         one_sample = partial(self._one_sample, model=model)
         time_sample = lambda x: timeit(lambda: one_sample(), "Running sample")
 
-        all_samples = parmap(time_sample, range(self.num_samples))
-        # all_samples = list(map(time_sample, range(self.num_samples)))
+        # all_samples = parmap(time_sample, range(self.num_samples))
+        all_samples = list(map(time_sample, range(self.num_samples)))
 
         return np.split(reduce(operator.add, all_samples), 2)
-                                 
+
     def run(self):
         """
         Input:
@@ -147,3 +152,4 @@ class Bootstrap:
 
         timed_model = lambda model: timeit(lambda: boot_error(model), "Running model")
         self.estimates = list(map(timed_model, self.models))
+

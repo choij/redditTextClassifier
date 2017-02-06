@@ -15,23 +15,18 @@ def main():
     x_df = fe.read_x_train_features()
     y_mat = fe.read_y_train_features()
 
-    x_df = x_df.head(100)
-    y_mat = y_mat[:100,:]
+    x_df = x_df.head(5000)
+    y_mat = y_mat[:5000,:]
 
     x_mat = fe.calc_count_matrix(x_df)
     # x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
-
-    """
-    TODO: make bootstrap a class
-    """
     loss = lambda y_hat, y: np.vectorize(int)(y_hat==y)
     models = [NaiveBayes()]
-    bootstrap = Bootstrap(x_mat, y_mat, loss, models, num_samples=10)
+    bootstrap = Bootstrap(x_mat, y_mat, loss, models, num_samples=200)
     bootstrap.run()
 
-    acc = bootstrap.models[0].print_metrics()
-    print("Accuracy on training set: {}".format(acc))
+    bootstrap.print_summary()
 
     # pd.DataFrame(y_hat).to_csv(fullpath("nb_predictions.csv"), header=False, index=False)
 
