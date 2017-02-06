@@ -24,6 +24,7 @@ class CategoricalMetric:
 
     def print(self):
         headers = ["Accuracy", "Precision", "Recall", "F1-Measure"]
+        print(self.prf)
         data = [self.acc] + self.prf.tolist()
         table = [headers, data]
         print(tabulate(table, headers="firstrow"))

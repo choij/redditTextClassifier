@@ -9,8 +9,12 @@ from metrics import CategoricalMetric
 from tools import parmap, timeit
 
 class Bootstrap:
+    """
+    Note: multiprocessing doesn't pass objects properly to update the metrics,
+        so currently only using a single process.
+    """
 
-    def __init__(self, x, y, loss_fun, models, num_samples=200, categorical=True, metric=CategoricalMetric):
+    def __init__(self, x, y, loss_fun, models, num_samples=200, categorical=True):
         self.x = x
         self.y = y
         self.loss_fun = loss_fun
@@ -149,7 +153,6 @@ class Bootstrap:
 
             err1_ = min(err_1, gamma)
             return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
-
         timed_model = lambda model: timeit(lambda: boot_error(model), "Running model")
         self.estimates = list(map(timed_model, self.models))
 
