@@ -9,6 +9,7 @@ class NaiveBayes():
         self.priors = None
         self.fitted = False
         self.metrics = CategoricalMetric()
+        self.most_recent_y_hat = None
 
     def is_fitted(self):
         return self.fitted
@@ -55,6 +56,8 @@ class NaiveBayes():
 
         x = x.todense().A
         indices = np.argmax(self.priors + np.dot(x, self.w.T), axis=1).A1
-        return self.class_names[indices].reshape(-1,1)
+        self.most_recent_y_hat = self.class_names[indices].reshape(-1,1)
+
+        return self.most_recent_y_hat
 
 
