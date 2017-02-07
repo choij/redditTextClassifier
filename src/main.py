@@ -12,18 +12,28 @@ def main():
     fullpath = lambda path: os.path.join(find_project_dir(), path)
 
     fe = FeatureEngineering()
-    x_df = fe.read_x_train_features()
+    x_ser = fe.read_x_train_features()
+    x_ser_clean = fe.read_clean_x_train_features()
     y_mat = fe.read_y_train_features()
 
-    x_df = x_df.head(500)
-    y_mat = y_mat[:500,:]
+    k = 500
+    x_ser = x_ser.head(k)
+    x_ser_clean = x_ser_clean.head(k)
+    y_mat = y_mat[:k,:]
 
-    x_mat = fe.calc_count_matrix(x_df)
+    x_mat = fe.calc_count_matrix(x_ser)
+    x_mat_clean = fe.calc_count_matrix(x_ser_clean)
     # x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
     loss = lambda y_hat, y: np.vectorize(int)(y_hat==y)
     models = [NaiveBayes()]
     bootstrap = Bootstrap(x_mat, y_mat, loss, models, num_samples=20)
+    bootstrap.run()
+
+    bootstrap.print_summary()
+
+    models = [NaiveBayes()]
+    bootstrap = Bootstrap(x_mat_clean, y_mat, loss, models, num_samples=20)
     bootstrap.run()
 
     bootstrap.print_summary()

@@ -28,50 +28,8 @@ class Bootstrap:
     def print_summary(self):
         for i in range(len(self.models)):
             self.models[i].print_metrics()
-            print("Error estimate: {}".format(self.estimates[i]))
-
-    def _one_sample(self, model):
-        """
-        Helper function for error. Samples from the data, fits a model,
-        and finds the loss on the outsample.
-
-        Output:
-            in_test_set - a 1D binary array with 1s indicating the 
-                presence of observation (i) in the test set.
-
-            loss - a 1D array of the loss for observation (i), equal to 0 
-                if (i) was not in the test set.
-        """
-        in_test_set = np.zeros(self.n)
-        loss = np.zeros(self.n)
-
-        model.unfit()
-        while not model.is_fitted():
-            try:
-                train = np.random.choice(self.n, self.n)
-                test = np.setdiff1d(np.arange(self.n), train)
-
-                model.fit(self.x[train], self.y[train])
-            except np.linalg.linalg.LinAlgError as e:
-                print("lin_alg_error")
-                pass
-
-        in_test_set[test] = 1
-        y_hat = model.predict(self.x[test])
-        model.update_metrics(y_hat, self.y[test])
-
-        loss[test] = self.loss_fun(y_hat, self.y[test])
-
-        return np.concatenate([in_test_set, loss])
-
-    def run_samples(self, model):
-        one_sample = partial(self._one_sample, model=model)
-        time_sample = lambda x: timeit(lambda: one_sample(), "Running sample")
-
-        # all_samples = parmap(time_sample, range(self.num_samples))
-        all_samples = list(map(time_sample, range(self.num_samples)))
-
-        return np.split(reduce(operator.add, all_samples), 2)
+            text = "Bootstrap .632+ error estimate: {:.5f}"
+            print(text.format(self.estimates[i]))
 
     def run(self):
         """
@@ -110,12 +68,53 @@ class Bootstrap:
                 bootstrap_error - float ".632+ bootstrap error"
             """
 
+            def one_sample():
+                """
+                Helper function for error. Samples from the data, fits a model,
+                and finds the loss on the outsample.
+
+                Output:
+                    in_test_set - a 1D binary array with 1s indicating the 
+                        presence of observation (i) in the test set.
+
+                    loss - a 1D array of the loss for observation (i), equal to 0 
+                        if (i) was not in the test set.
+                """
+                in_test_set = np.zeros(self.n)
+                loss = np.zeros(self.n)
+
+                model.unfit()
+                while not model.is_fitted():
+                    try:
+                        train = np.random.choice(self.n, self.n)
+                        test = np.setdiff1d(np.arange(self.n), train)
+
+                        model.fit(self.x[train], self.y[train])
+                    except np.linalg.linalg.LinAlgError as e:
+                        print("lin_alg_error")
+                        pass
+
+                in_test_set[test] = 1
+                y_hat = model.predict(self.x[test])
+                model.update_metrics(y_hat, self.y[test])
+
+                loss[test] = self.loss_fun(y_hat, self.y[test])
+
+                return np.concatenate([in_test_set, loss])
+
+            def run_samples():
+
+                # all_samples = parmap(one_sample, range(self.num_samples))
+                all_samples = [one_sample() for i in range(self.num_samples)]
+
+                return np.split(reduce(operator.add, all_samples), 2)
+
             q = math.pow(1 - 1/self.n, self.n)
             p = 1 - q
 
-            in_test_set, loss = self.run_samples(model)
+            in_test_set, loss = run_samples()
             
-            timeit(lambda:model.fit(self.x, self.y), "Fitting overall model")
+            model.fit(self.x, self.y)
             y_hat = model.predict(self.x)
 
             if any(in_test_set == 0):
