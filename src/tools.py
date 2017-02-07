@@ -14,6 +14,25 @@ def find_project_dir():
     curr_path, _ = os.path.split(os.path.realpath(__file__))
     return os.path.join(curr_path, "..")
 
+def timit(func):
+    """
+    Times a function and returns a tuple, the result of the
+    function and the time in seconds it took to run. Usage:
+
+    @timeit
+    def mylongfunc():
+          pass
+
+    From https://gist.github.com/bbengfort/a91680c79a62bcc93ea1
+    """
+    def wrapper(*args, **kwargs):
+          start  = time.time()
+          result = func(*args, **kwargs)
+          finit  = time.time()
+          delta  = finit - start
+          return result, delta
+    return wrapper
+
 def timeit(f, s):
     """
     Helper function to time a function and print a string before and
