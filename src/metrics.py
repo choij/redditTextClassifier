@@ -27,3 +27,6 @@ class CategoricalMetric:
         data = [self.acc] + self.prf.tolist()
         table = [headers, data]
         print(tabulate(table, headers="firstrow"))
+
+    def get_metrics(self):
+        return [self.acc] + self.prf.tolist()

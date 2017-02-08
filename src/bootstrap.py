@@ -6,7 +6,7 @@ import itertools
 
 from functools import reduce, partial
 from metrics import CategoricalMetric
-from tools import parmap, timeit
+from tools import parmap, timeit, timit
 
 class Bootstrap:
     """
@@ -30,6 +30,14 @@ class Bootstrap:
             self.models[i].print_metrics()
             text = "Bootstrap .632+ error estimate: {:.5f}"
             print(text.format(self.estimates[i]))
+
+    def comma_separated_metrics(self, prepend=lambda x: []):
+        for i in range(len(self.models)):
+            metrics = self.models[i].get_metrics()
+            metrics.append(self.estimates[i])
+            metrics = list(map(str, metrics))
+            metrics = prepend(self.models[i]) + metrics
+            print(", ".join(metrics))
 
     def run(self):
         """
@@ -67,7 +75,7 @@ class Bootstrap:
             Output:
                 bootstrap_error - float ".632+ bootstrap error"
             """
-
+            
             def one_sample():
                 """
                 Helper function for error. Samples from the data, fits a model,
@@ -152,6 +160,6 @@ class Bootstrap:
 
             err1_ = min(err_1, gamma)
             return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
-        timed_model = lambda model: timeit(lambda: boot_error(model), "Running model")
-        self.estimates = list(map(timed_model, self.models))
+  
+        self.estimates = list(map(boot_error, self.models))
 
