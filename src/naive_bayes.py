@@ -106,8 +106,6 @@ class WCNB(NaiveBayes):
             counts[y_i] += x[i]
 
         self.class_names = np.array(sorted(classes.keys()))
-        # self.priors = np.array([classes[y_i] + 1 for y_i in self.class_names])/(n + len(self.class_names))
-        
         outclass = lambda c: sum(counts[cl] for cl in set(np.unique(y)) - {c})
 
         counts = np.vstack(list(map(outclass, self.class_names)))

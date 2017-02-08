@@ -86,6 +86,9 @@ def main():
 
         print("done preproc")
 
+        """
+        Run bootstrap.
+        """
         # bootstrap = Bootstrap(x_tfidf_clean, y_mat_tfidf, loss, [WCNB()], num_samples=nsamp)
         # bootstrap.run()
         # bootstrap.print_summary()
@@ -96,9 +99,12 @@ def main():
         # bootstrap.print_summary()
         # bootstrap.models[0].save(fullpath('models/nb'))
 
-        # """
-        # Note: features are different
-        # """
+        """
+        Run fe.cv.transform() or fe.tf.transform() to get features
+        after learning a model. Right now you have to run fe.calc_XXX_matrix
+        on the data that was used to train the model first, then
+        fe.XX.transform(x), where x is a Pandas series.
+        """
         # model = WCNB()
         # model.fit(x_tfidf_clean, y_mat)
         # model.save(fullpath('models/wcnb'))
