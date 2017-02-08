@@ -38,7 +38,7 @@ class FeatureEngineering:
 
     def clean_row(self, row):
         """
-        Helper function for 'clean'.
+        Helper function for 'clean'. Inspired by http://bbengfort.github.io/tutorials/2016/05/19/text-classification-nltk-sckit-learn.html
         """
         validate = lambda x: not (all(char in self.punct for char in x[0]) or x[0] in self.stopwords) 
 
@@ -51,7 +51,7 @@ class FeatureEngineering:
 
         return " ".join(stemmed)
 
-    def clean(self, df):
+    def clean(self, df, p=False):
         """
         Runs the following procedure on each row:
             1. Tokenizes the sentences
@@ -60,7 +60,7 @@ class FeatureEngineering:
             4. Removes stop-words and punctuation
             5. Lemmatizes each word
             6. Stems each word
-            7. Merges the list of rows into space-separated strig
+            7. Merges the list of rows into space-separated string
         """
 
         df = pd.DataFrame(df)
@@ -78,6 +78,12 @@ class FeatureEngineering:
 
         return ser
 
+    def read_x_test_features(self):
+        df = pd.read_csv(self.dir("data/test_input.csv"))
+        ser = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
+
+        return ser
+
     def replace_unwanted_str(self, row):
         """
         Removes HTML tags.
@@ -90,9 +96,9 @@ class FeatureEngineering:
 
         return count_matrix
 
-    def calc_tfid_matrix(self, df):
-        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0, stop_words='english')
-        tfidf_matrix = tf.fit_transform(df.tolist())
+    def calc_tfid_matrix(self, ser, max_ngrams=3, min_df=0):
+        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, max_ngrams), min_df=min_df, stop_words='english')
+        tfidf_matrix = tf.fit_transform(ser.tolist())
         feature_names = tf.get_feature_names()
 
         return tfidf_matrix
@@ -114,5 +120,6 @@ if __name__ == '__main__':
     x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
     y_mat = y_mat[:500,:]
+
 
 
