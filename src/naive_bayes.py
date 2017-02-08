@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import vstack
+from scipy import sparse
 from numpy.linalg import norm
 import operator
 
@@ -43,20 +43,19 @@ class NaiveBayes(BootstrapModel):
         self.class_names = np.array(sorted(classes.keys()))
         self.priors = np.array([classes[y_i] + 1 for y_i in self.class_names])/(n + len(self.class_names))
         
-        counts = vstack([counts[y_i] for y_i in self.class_names]).todense()
+        counts = sparse.vstack([counts[y_i] for y_i in self.class_names]).todense()
 
         total_counts = np.sum(counts, axis=1).reshape(-1,1)
         count_proportions = (counts + 1)/(total_counts + alpha)
-        self.w = count_proportions
+        self.w = count_proportions.T
         self.fitted = True
 
     def calc_sum(self, x):
         if not self.fitted:
             return "Run NaiveBayes.fit() before predicting."
 
-        x = x.todense().A
-
-        return np.log(self.priors) + np.dot(x, np.log(self.w.T))
+        weights = sparse.csr_matrix(np.log(self.w))
+        return np.log(self.priors) + np.dot(x, weights).todense()
 
     def predict_map(self, x):
         indices = self.argop(self.calc_sum(x), axis=1).flat
@@ -116,13 +115,11 @@ class WCNB(NaiveBayes):
 
         # "Poor Assumptions" ss 3.2
         w = np.log((counts + 1)/(total_counts + alpha))
-        self.w = w/norm(w, axis=1, ord=1).reshape(-1,1)
+        self.w = (w/norm(w, axis=1, ord=1).reshape(-1,1)).T
         self.fitted = True
 
     def calc_sum(self, x):
         if not self.fitted:
             return "Run NaiveBayes.fit() before predicting."
 
-        x = x.todense().A
-
-        return np.dot(x, self.w.T)
+        return np.dot(x, sparse.csr_matrix(self.w)).todense()

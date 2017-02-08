@@ -22,6 +22,8 @@ class FeatureEngineering:
         self.lemmatizer = WordNetLemmatizer()
         self.stemmer = EnglishStemmer()
 
+        self.tf = None
+
     def lemmatize(self, t):
         """
         Converts Treebank tags into WordNet tags and calls the lemmatizer.
@@ -72,6 +74,10 @@ class FeatureEngineering:
         fp = self.dir("data/cleaned_train_input.csv")
         return pd.read_csv(fp, header=None)[0]
 
+    def read_clean_x_test_features(self):
+        fp = self.dir("data/cleaned_test_input.csv")
+        return pd.read_csv(fp, header=None)[0]
+
     def read_x_train_features(self):
         df = pd.read_csv(self.dir("data/train_input.csv"))
         ser = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
@@ -91,15 +97,15 @@ class FeatureEngineering:
         return re.sub('<[^<]+?>', '', row)
 
     def calc_count_matrix(self, ser):
-        count_vector = CountVectorizer()
-        count_matrix = count_vector.fit_transform(ser.tolist())
+        self.cv = CountVectorizer()
+        count_matrix = self.cv.fit_transform(ser.tolist())
 
         return count_matrix
 
     def calc_tfid_matrix(self, ser, max_ngrams=3, min_df=0):
-        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, max_ngrams), min_df=min_df, stop_words='english')
-        tfidf_matrix = tf.fit_transform(ser.tolist())
-        feature_names = tf.get_feature_names()
+        self.tf = TfidfVectorizer(analyzer='word', ngram_range=(1, max_ngrams), min_df=min_df)
+        tfidf_matrix = self.tf.fit_transform(ser.tolist())
+        feature_names = self.tf.get_feature_names()
 
         return tfidf_matrix
 
@@ -114,10 +120,11 @@ class FeatureEngineering:
 
 if __name__ == '__main__':
     fe = FeatureEngineering()
-    x_ser = fe.read_x_train_features()
+    x_ser = fe.read_clean_x_train_features()
     y_mat = fe.read_y_train_features()
     x_mat = fe.calc_count_matrix(x_ser)
-    x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
+    x_tfidf = fe.calc_tfid_matrix(x_ser)
+    # x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
     y_mat = y_mat[:500,:]
 

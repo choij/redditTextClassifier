@@ -149,7 +149,6 @@ class Bootstrap:
                 counts -= 1 # remove effect of adding all class names
                 obs_prop = counts/counts.sum()
 
-                print(obs_prop.shape, orig_prop.shape)
                 gamma = (orig_prop * (1 - obs_prop)).sum()
 
             else:
