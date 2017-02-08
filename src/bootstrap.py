@@ -3,6 +3,7 @@ import math
 import operator
 import numpy as np
 import itertools
+import pickle
 
 from functools import reduce, partial
 from metrics import CategoricalMetric
@@ -75,7 +76,7 @@ class Bootstrap:
             Output:
                 bootstrap_error - float ".632+ bootstrap error"
             """
-            
+            # @timit
             def one_sample():
                 """
                 Helper function for error. Samples from the data, fits a model,
@@ -136,7 +137,11 @@ class Bootstrap:
             err_632 = q * err_bar + p * err_1
 
             if self.categorical:
-                orig_prop = model.priors
+                class_names = set(np.unique(self.y))
+                counts = {c:0 for c in class_names}
+                for i in range(len(self.y)):
+                    counts[self.y[i][0]] += 1
+                orig_prop = np.array([counts[c] for c in sorted(class_names)])
                 vert_names = model.class_names.reshape(-1,1)
                 y_au = np.sort(np.vstack((y_hat, vert_names)))
                 i_count = np.asarray(np.unique(y_au, return_counts=True)).T
@@ -144,6 +149,7 @@ class Bootstrap:
                 counts -= 1 # remove effect of adding all class names
                 obs_prop = counts/counts.sum()
 
+                print(obs_prop.shape, orig_prop.shape)
                 gamma = (orig_prop * (1 - obs_prop)).sum()
 
             else:
@@ -163,3 +169,33 @@ class Bootstrap:
   
         self.estimates = list(map(boot_error, self.models))
 
+class BootstrapModel:
+    def __init__(self, filepath='no_filepath_set'):
+        self.fitted = False
+        self.metrics = CategoricalMetric()
+        self.most_recent_y_hat = None
+        self.filepath = filepath
+
+    @staticmethod
+    def load(filepath):
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)
+
+    def save(self, filepath):
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def is_fitted(self):
+        return self.fitted
+
+    def unfit(self):
+        self.fitted = False
+
+    def update_metrics(self, y_hat, y_test):
+        self.metrics.update(y_hat, y_test)
+
+    def print_metrics(self):
+        self.metrics.print()
+
+    def get_metrics(self):
+        return self.metrics.get_metrics()

@@ -4,23 +4,19 @@ from numpy.linalg import norm
 import operator
 
 from metrics import CategoricalMetric
+from bootstrap import BootstrapModel
 
-class NaiveBayes():
+class NaiveBayes(BootstrapModel):
 
-    def __init__(self, posterior=False):
+    def __init__(self, posterior=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.name = "N"
         self.priors = None
         self.w = None
         self.class_names = None
-        self.fitted = False
 
-        self.metrics = CategoricalMetric()
-        self.most_recent_y_hat = None
         self.predict = self.predict_post if posterior else self.predict_map
         self.argop = np.argmax
-
-    def is_fitted(self):
-        return self.fitted
 
     def unfit(self):
         self.priors = None
@@ -28,15 +24,6 @@ class NaiveBayes():
         self.class_names = None
 
         self.fitted = False
-
-    def update_metrics(self, y_hat, y_test):
-        self.metrics.update(y_hat, y_test)
-
-    def print_metrics(self):
-        self.metrics.print()
-
-    def get_metrics(self):
-        return self.metrics.get_metrics()
 
     def fit(self, x, y):
         _, alpha = x.shape
@@ -95,8 +82,8 @@ class WCNB(NaiveBayes):
     """
     Doesn't really work with count matrices - just tf-idf matrices
     """
-    def __init__(self, posterior=False):
-        super().__init__(posterior)
+    def __init__(self, posterior=False, *args, **kwargs):
+        super().__init__(posterior, *args, **kwargs)
         self.predict = self.predict_post if posterior else self.predict_map
         self.argop = np.argmin
         self.name="C"
