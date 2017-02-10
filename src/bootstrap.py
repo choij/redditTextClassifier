@@ -15,7 +15,7 @@ class Bootstrap:
         so currently only using a single process.
     """
 
-    def __init__(self, x, y, loss_fun, models, num_samples=200, categorical=True):
+    def __init__(self, x, y, models, loss_fun=lambda y_hat, y: (y_hat-y)**2,num_samples=200, categorical=True):
         self.x = x
         self.y = y
         self.loss_fun = loss_fun
@@ -23,7 +23,7 @@ class Bootstrap:
         self.num_samples = num_samples
         self.categorical = categorical
 
-        self.n, _ = x.shape
+        self.n = x.shape[0]
         self.estimates = []
 
     def print_summary(self):
@@ -40,6 +40,7 @@ class Bootstrap:
             metrics = prepend(self.models[i]) + metrics
             print(", ".join(metrics))
 
+    # @timit
     def run(self):
         """
         Input:
@@ -183,6 +184,9 @@ class BootstrapModel:
     def save(self, filepath):
         with open(filepath, 'wb') as f:
             pickle.dump(self, f)
+
+    def fit(self, x, y):
+        pass
 
     def is_fitted(self):
         return self.fitted

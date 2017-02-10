@@ -3,6 +3,7 @@ import numpy as np
 import os
 import re
 import string
+import spacy
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,6 +11,8 @@ from nltk.corpus import stopwords, wordnet
 from nltk.stem.snowball import EnglishStemmer
 from nltk import wordpunct_tokenize, WordNetLemmatizer, sent_tokenize, pos_tag
 from itertools import chain
+from collections import defaultdict
+from scipy import sparse
 
 from tools import find_project_dir
 
@@ -118,6 +121,17 @@ class FeatureEngineering:
     def merge_matrix(self, mat1, mat2):
         return np.concatenate((mat1,mat2), axis=1)
 
+class WordVectorizer:
+    def __init__(self):
+        self.nlp = spacy.load('en')
+
+    def fit(self, x):
+        pass
+
+    def transform(self, x):
+        return np.vstack([nlp(x_i).vector for x_i in x])
+
+
 if __name__ == '__main__':
     fe = FeatureEngineering()
     x_ser = fe.read_clean_x_train_features()
@@ -127,6 +141,3 @@ if __name__ == '__main__':
     # x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
     y_mat = y_mat[:500,:]
-
-
-
