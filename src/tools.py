@@ -29,8 +29,8 @@ def timit(func):
           start  = time.time()
           result = func(*args, **kwargs)
           finit  = time.time()
-          delta  = finit - start
-          return result, delta
+          print(finit-start)
+          return result
     return wrapper
 
 def timeit(f, s):

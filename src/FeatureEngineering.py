@@ -22,6 +22,8 @@ class FeatureEngineering:
         # self.lemmatizer = WordNetLemmatizer()
         # self.stemmer = EnglishStemmer()
 
+        self.tf = None
+
     def lemmatize(self, t):
         """
         Converts Treebank tags into WordNet tags and calls the lemmatizer.
@@ -38,7 +40,7 @@ class FeatureEngineering:
 
     def clean_row(self, row):
         """
-        Helper function for 'clean'.
+        Helper function for 'clean'. Inspired by http://bbengfort.github.io/tutorials/2016/05/19/text-classification-nltk-sckit-learn.html
         """
         validate = lambda x: not (all(char in self.punct for char in x[0]) or x[0] in self.stopwords) 
 
@@ -51,7 +53,7 @@ class FeatureEngineering:
 
         return " ".join(stemmed)
 
-    def clean(self, df):
+    def clean(self, df, p=False):
         """
         Runs the following procedure on each row:
             1. Tokenizes the sentences
@@ -60,7 +62,7 @@ class FeatureEngineering:
             4. Removes stop-words and punctuation
             5. Lemmatizes each word
             6. Stems each word
-            7. Merges the list of rows into space-separated strig
+            7. Merges the list of rows into space-separated string
         """
 
         df = pd.DataFrame(df)
@@ -72,8 +74,18 @@ class FeatureEngineering:
         fp = self.dir("data/cleaned_train_input.csv")
         return pd.read_csv(fp, header=None)[0]
 
+    def read_clean_x_test_features(self):
+        fp = self.dir("data/cleaned_test_input.csv")
+        return pd.read_csv(fp, header=None)[0]
+
     def read_x_train_features(self):
         df = pd.read_csv(self.dir("data/train_input.csv"), nrows=200)
+        ser = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
+
+        return ser
+
+    def read_x_test_features(self):
+        df = pd.read_csv(self.dir("data/test_input.csv"))
         ser = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
 
         return ser
@@ -85,15 +97,15 @@ class FeatureEngineering:
         return re.sub('<[^<]+?>', '', row)
 
     def calc_count_matrix(self, ser):
-        count_vector = CountVectorizer()
-        count_matrix = count_vector.fit_transform(ser.tolist())
+        self.cv = CountVectorizer()
+        count_matrix = self.cv.fit_transform(ser.tolist())
 
         return count_matrix
 
-    def calc_tfid_matrix(self, df):
-        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0, stop_words='english')
-        tfidf_matrix = tf.fit_transform(df.tolist())
-        feature_names = tf.get_feature_names()
+    def calc_tfid_matrix(self, ser, max_ngrams=3, min_df=0):
+        self.tf = TfidfVectorizer(analyzer='word', ngram_range=(1, max_ngrams), min_df=min_df)
+        tfidf_matrix = self.tf.fit_transform(ser.tolist())
+        feature_names = self.tf.get_feature_names()
 
         return tfidf_matrix
 
@@ -108,11 +120,13 @@ class FeatureEngineering:
 
 if __name__ == '__main__':
     fe = FeatureEngineering()
-    x_ser = fe.read_x_train_features()
+    x_ser = fe.read_clean_x_train_features()
     y_mat = fe.read_y_train_features()
     x_mat = fe.calc_count_matrix(x_ser)
-    x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
+    x_tfidf = fe.calc_tfid_matrix(x_ser)
+    # x_y_train_mat = fe.merge_matrix(x_mat.todense(),y_mat)
 
     y_mat = y_mat[:500,:]
+
 
 

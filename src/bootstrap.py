@@ -3,10 +3,11 @@ import math
 import operator
 import numpy as np
 import itertools
+import pickle
 
 from functools import reduce, partial
 from metrics import CategoricalMetric
-from tools import parmap, timeit
+from tools import parmap, timeit, timit
 
 class Bootstrap:
     """
@@ -30,6 +31,14 @@ class Bootstrap:
             self.models[i].print_metrics()
             text = "Bootstrap .632+ error estimate: {:.5f}"
             print(text.format(self.estimates[i]))
+
+    def comma_separated_metrics(self, prepend=lambda x: []):
+        for i in range(len(self.models)):
+            metrics = self.models[i].get_metrics()
+            metrics.append(self.estimates[i])
+            metrics = list(map(str, metrics))
+            metrics = prepend(self.models[i]) + metrics
+            print(", ".join(metrics))
 
     def run(self):
         """
@@ -67,7 +76,7 @@ class Bootstrap:
             Output:
                 bootstrap_error - float ".632+ bootstrap error"
             """
-
+            # @timit
             def one_sample():
                 """
                 Helper function for error. Samples from the data, fits a model,
@@ -128,7 +137,11 @@ class Bootstrap:
             err_632 = q * err_bar + p * err_1
 
             if self.categorical:
-                orig_prop = model.priors
+                class_names = set(np.unique(self.y))
+                counts = {c:0 for c in class_names}
+                for i in range(len(self.y)):
+                    counts[self.y[i][0]] += 1
+                orig_prop = np.array([counts[c] for c in sorted(class_names)])
                 vert_names = model.class_names.reshape(-1,1)
                 y_au = np.sort(np.vstack((y_hat, vert_names)))
                 i_count = np.asarray(np.unique(y_au, return_counts=True)).T
@@ -152,6 +165,36 @@ class Bootstrap:
 
             err1_ = min(err_1, gamma)
             return err_632 + (err1_ - err_bar) * (p * q * r) / (1 - q * r)
-        timed_model = lambda model: timeit(lambda: boot_error(model), "Running model")
-        self.estimates = list(map(timed_model, self.models))
+  
+        self.estimates = list(map(boot_error, self.models))
 
+class BootstrapModel:
+    def __init__(self, filepath='no_filepath_set'):
+        self.fitted = False
+        self.metrics = CategoricalMetric()
+        self.most_recent_y_hat = None
+        self.filepath = filepath
+
+    @staticmethod
+    def load(filepath):
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)
+
+    def save(self, filepath):
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def is_fitted(self):
+        return self.fitted
+
+    def unfit(self):
+        self.fitted = False
+
+    def update_metrics(self, y_hat, y_test):
+        self.metrics.update(y_hat, y_test)
+
+    def print_metrics(self):
+        self.metrics.print()
+
+    def get_metrics(self):
+        return self.metrics.get_metrics()
