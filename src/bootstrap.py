@@ -15,7 +15,7 @@ class Bootstrap:
         so currently only using a single process.
     """
 
-    def __init__(self, x, y, models, loss_fun=lambda y_hat, y: (y_hat-y)**2,num_samples=200, categorical=True):
+    def __init__(self, x, y, models, loss_fun=lambda y_hat, y: (y_hat==y)**2,num_samples=200, categorical=True):
         self.x = x
         self.y = y
         self.loss_fun = loss_fun

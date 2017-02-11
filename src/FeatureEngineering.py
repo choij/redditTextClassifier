@@ -82,7 +82,7 @@ class FeatureEngineering:
         return pd.read_csv(fp, header=None)[0]
 
     def read_x_train_features(self):
-        df = pd.read_csv(self.dir("data/train_input.csv"), nrows=200)
+        df = pd.read_csv(self.dir("data/train_input.csv"))
         ser = df.apply(lambda x: self.replace_unwanted_str(x['conversation']), axis=1)
 
         return ser
@@ -113,7 +113,7 @@ class FeatureEngineering:
         return tfidf_matrix
 
     def read_y_train_features(self):
-        df = pd.read_csv(self.dir("data/train_output.csv"), nrows=200)
+        df = pd.read_csv(self.dir("data/train_output.csv"), nrows=10000)
         df = df.drop('id', axis=1)
         y_train = df.as_matrix()
         return y_train
@@ -129,7 +129,7 @@ class WordVectorizer:
         pass
 
     def transform(self, x):
-        return np.vstack([nlp(x_i).vector for x_i in x])
+        return np.vstack([self.nlp(x_i).vector for x_i in x])
 
 
 if __name__ == '__main__':
