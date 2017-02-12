@@ -12,7 +12,7 @@ class KNN(BootstrapModel):
     def __init__(self):
         super().__init__()
 
-    # @timit
+    @timit
     def calcKNN(self, test=None, k=10):
         d_list = defaultdict(lambda: 0)
         for i in range(self.x_train.shape[0]):
@@ -23,6 +23,15 @@ class KNN(BootstrapModel):
         d_list = sorted(d_list.items(), key=lambda k_v: k_v[1], reverse=True)
         return d_list[0][0]
 
+    # @timit
+    def calcKNN_E(self, test=None, k=10):
+        s = np.sum(np.abs(self.x_train - test) ** 2, axis=-1) ** (1. / 2)
+        s = 1/s
+        label = self.y_train.flatten().tolist()
+        d_list = dict(zip(label, s))
+        d_list = sorted(d_list.items(), key=lambda k_v: k_v[1], reverse=True)
+        return d_list[0][0]
+
     def fit(self, x, y):
         self.x_train = x
         self.y_train = y
@@ -30,10 +39,13 @@ class KNN(BootstrapModel):
         self.fitted = True
 
     def predict(self, x_test):
-        predictions = []
-        for row in x_test:
-            p = self.calcKNN(row)
-            predictions.append(p)
+        # predictions = []
+        # for row in x_test:
+        #     p = self.calcKNN_E(row)
+        #     # p = self.calcKNN(row)
+        #     predictions.append(p)
+
+        predictions = [self.calcKNN_E(row) for row in x_test]
         return np.array(predictions).reshape(-1,1)
 
 if __name__ == "__main__":
