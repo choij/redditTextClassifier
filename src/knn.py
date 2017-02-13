@@ -13,6 +13,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn import decomposition
 from sklearn import preprocessing
+import operator
+from collections import Counter
 
 
 
@@ -33,13 +35,18 @@ class KNN(BootstrapModel):
         return d_list[0][0]
 
     # @timit
-    def calcKNN_E(self, test=None, k=50):
+    def calcKNN_E(self, test=None, k=30):
         s = np.sum(np.abs(self.x_train - test) ** 2, axis=-1) ** (1. / 2)
         s = 1/s
         label = self.y_train.flatten().tolist()
-        d_list = dict(zip(label, s))
-        d_list = sorted(d_list.items(), key=lambda k_v: k_v[1], reverse=True)
-        return d_list[0][0]
+        vals = [(k, v) for k, v in zip(label, s)]
+        vals.sort(key=operator.itemgetter(1), reverse=True)
+        nearest_n = [vals[n][0] for n in range(k)]
+        nn_count = dict(Counter(nearest_n))
+        return max(nn_count.items(), key=operator.itemgetter(1))[0]
+        # d_list = dict(zip(label, s))
+        # d_list = sorted(d_list.items(), key=lambda k_v: k_v[1], reverse=True)
+        # return nearest_n[0][0]
 
     def fit(self, x, y):
         self.x_train = x
@@ -60,7 +67,8 @@ class KNN(BootstrapModel):
 if __name__ == "__main__":
     fe = FeatureEngineering()
     wv = WordVectorizer()
-    x_ser = fe.read_clean_x_train_features().head(5000)
+    # x_ser = fe.read_clean_x_train_features().head(10)
+    x_ser = fe.read_x_train_features().head(5000)
     y_mat = fe.read_y_train_features()
     # x_mat = fe.calc_count_matrix(x_ser)
     # x_mat = fe.calc_tfid_matrix(x_ser)
@@ -69,27 +77,27 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(x_mat, y_mat, test_size=0.2,
                                                                          random_state=1)
 
-    pca = decomposition.PCA(n_components=50)
-    pca.fit(X_train)
-    X_train = pca.transform(X_train)
-
-    pca = decomposition.PCA(n_components=50)
-    pca.fit(X_test)
-    X_test = pca.transform(X_test)
+    # pca = decomposition.PCA(n_components=50)
+    # pca.fit(X_train)
+    # X_train = pca.transform(X_train)
+    #
+    # pca = decomposition.PCA(n_components=50)
+    # pca.fit(X_test)
+    # X_test = pca.transform(X_test)
 
     X_train = preprocessing.normalize(X_train, norm='l2')
     X_test = preprocessing.normalize(X_test, norm='l2')
 
     knn = KNN()
     knn.fit(X_train, y_train)
-    y_hat = knn.predict(X_test)
+    # y_hat = knn.predict(X_test)
 
     # Actual predictions on test data
-    # x_test = fe.read_clean_x_test_features()
-    # fullpath = lambda path: os.path.join(find_project_dir(), path)
-    #
-    # y_hat = knn.predict(wv.transform(x_test))
-    # pd.DataFrame(y_hat,).to_csv(fullpath("models/knn_output.csv"), header=['category'], index_label='id')
+    x_test = fe.read_clean_x_test_features()
+    fullpath = lambda path: os.path.join(find_project_dir(), path)
+
+    y_hat = knn.predict(wv.transform(x_test))
+    pd.DataFrame(y_hat,).to_csv(fullpath("models/knn_output.csv"), header=['category'], index_label='id')
 
     cm = CategoricalMetric()
     cm.update(y_hat, y_test)
