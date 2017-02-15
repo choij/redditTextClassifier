@@ -129,7 +129,7 @@ class WordVectorizer:
         pass
 
     def transform(self, x):
-        return np.vstack([nlp(x_i).vector for x_i in x])
+        return np.vstack([self.nlp(x_i).vector for x_i in x])
 
 
 if __name__ == '__main__':
