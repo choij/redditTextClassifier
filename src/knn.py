@@ -7,11 +7,14 @@ from FeatureEngineering import FeatureEngineering, WordVectorizer
 from bootstrap import BootstrapModel
 from matplotlib import pyplot as plt
 from metrics import CategoricalMetric
-from sklearn import preprocessing
+from sklearn import preprocessing, decomposition
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import train_test_split
 import pandas as pd
-
+from tools import find_project_dir
+import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from naive_bayes import NaiveBayes, WCNB
 
 class KNN(BootstrapModel):
 
@@ -28,6 +31,7 @@ class KNN(BootstrapModel):
         """
         s = np.sum(np.abs(self.x_train - test) ** 2, axis=-1) ** (1. / 2)
         s = 1/np.power(s, 2)
+        # s = 1/s
         label = self.y_train.flatten().tolist()
         vals = [(k, v) for k, v in zip(label, s)]
         vals.sort(key=operator.itemgetter(1), reverse=True)
@@ -114,6 +118,9 @@ class KNN(BootstrapModel):
 
 
 if __name__ == "__main__":
+    fullpath = lambda path: os.path.join(find_project_dir(), path)
+
+
     fe = FeatureEngineering()
     wv = WordVectorizer()
     # x_ser = fe.read_clean_x_train_features().head(10)
@@ -136,20 +143,76 @@ if __name__ == "__main__":
 
     X_train = preprocessing.normalize(X_train, norm='l2')
     X_test = preprocessing.normalize(X_test, norm='l2')
+    #
+
+    X_train = preprocessing.normalize(X_train, norm='l2')
+    X_test = preprocessing.normalize(X_test, norm='l2')
+
+    fe = FeatureEngineering()
+    x_ser_clean = fe.read_clean_x_train_features().head(5000)
+    y_mat = fe.read_y_train_features()
+
+    X_train, X_test, y_train, y_test = train_test_split(x_ser_clean, y_mat, test_size=0.2,
+                                                        random_state=1)
+
+    preproc = TfidfVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5, norm='l2')
+    model = WCNB(preproc=None)
+    x_mat = preproc.fit_transform(x_ser_clean)
+    model.fit(X_train, y_train)
+    y_hat = model.predict(X_test)
+
+
+    # knn = KNN()
+    # knn.fit(X_train, y_train)
+    # y_hat = knn.predict(X_test)
+    #
+    # p_test = pd.DataFrame(y_test)
+    # p_test = pd.get_dummies(p_test).as_matrix()
+    #
+    # y_score = pd.DataFrame(y_hat)
+    # y_score = pd.get_dummies(y_score).as_matrix()
+    #
+    # classes = y_score.shape[1]
+    #
+    # knn.plot_roc_curve(classes, y_score, p_test)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     knn = KNN()
-    knn.fit(X_train, y_train)
-    y_hat = knn.predict(X_test)
+    # knn.fit(X_train, y_train)
+    # y_hat = knn.predict(X_test)
+    y_hat = pd.read_csv(fullpath("data/niko_yhat.csv"), nrows=5000)
+    y_hat = y_hat['category']
+    y_score = pd.get_dummies(y_hat).as_matrix()
 
-    p_test = pd.DataFrame(y_test)
+    # p_test = pd.DataFrame(y_test)
+
+
+    # p_test = pd.get_dummies(y_hat).as_matrix()
+
+
+    # y_score = pd.DataFrame(y_hat)
+    p_test = pd.read_csv(fullpath("data/train_output.csv"), nrows=5000)
+    p_test = p_test['category']
     p_test = pd.get_dummies(p_test).as_matrix()
-
-    y_score = pd.DataFrame(y_hat)
-    y_score = pd.get_dummies(y_score).as_matrix()
-
+    #
     classes = y_score.shape[1]
 
-    knn.plot_roc_curve(classes, y_score, p_test)
+    knn.plot_roc_curve(classes, p_test, y_score)
 
     # loss = lambda y_hat, y: np.vectorize(int)(y_hat == y)
     # bootstrap = Bootstrap(X_train, y_train, [KNN()], loss, num_samples=5)
@@ -163,7 +226,6 @@ if __name__ == "__main__":
     # y_hat = knn.predict(wv.transform(x_test))
     # pd.DataFrame(y_hat,).to_csv(fullpath("models/knn_output.csv"), header=['category'], index_label='id')
 
-    print("K=60")
-    cm = CategoricalMetric()
-    cm.update(y_hat, y_test)
-    cm.print()
+    # cm = CategoricalMetric()
+    # cm.update(y_hat, y_test)
+    # cm.print()
