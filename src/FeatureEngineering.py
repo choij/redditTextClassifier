@@ -20,10 +20,10 @@ class FeatureEngineering:
     def __init__(self):
         self.dir = lambda path: os.path.join(find_project_dir(), path)
 
-        # self.stopwords = set(stopwords.words('english'))
-        # self.punct = set(string.punctuation)
-        # self.lemmatizer = WordNetLemmatizer()
-        # self.stemmer = EnglishStemmer()
+        self.stopwords = set(stopwords.words('english'))
+        self.punct = set(string.punctuation)
+        self.lemmatizer = WordNetLemmatizer()
+        self.stemmer = EnglishStemmer()
 
         self.tf = None
 
@@ -113,7 +113,7 @@ class FeatureEngineering:
         return tfidf_matrix
 
     def read_y_train_features(self):
-        df = pd.read_csv(self.dir("data/train_output.csv"), nrows=5000)
+        df = pd.read_csv(self.dir("data/train_output.csv"))
         df = df.drop('id', axis=1)
         y_train = df.as_matrix()
         return y_train

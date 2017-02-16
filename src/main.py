@@ -2,69 +2,134 @@ import numpy as np
 import pandas as pd
 import os
 import itertools
+import time
+import sys
+
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.metrics import roc_curve, auc
+from matplotlib import pyplot as plt
+
 
 from naive_bayes import NaiveBayes, WCNB
-from sklearn.feature_extraction.text import TfidfVectorizer
 from FeatureEngineering import FeatureEngineering
-from tools import find_project_dir
+from tools import find_project_dir, parmap
 from bootstrap import Bootstrap
 
+def plot_roc_curve(categories, y_score, y_test):
+    """
+    Plots ROC score
+    :param categories: number of categories
+    :param y_score:
+    :param y_test:
+    :return:
+    """
 
-def sweep(loss, csv=True, cln=["Clean "], ngrams=[2,4], min_df=[0], max_df=[0.7]):
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(categories):
+        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
 
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_score.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr[2], tpr[2], color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[2])
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Naive Bayes')
+    plt.legend(loc="lower right")
+    plt.show()
+
+def sweep(loss, csv=True, cln=["Clean "], ngrams=[1, 4, 5, 6, 7], min_df=[0.00001], max_df=[0.5, 0.6, 0.7], K=[]):
+
+    fullpath = lambda path: os.path.join(find_project_dir(), path)
+    nsamp = [1000, 500, 200, 200, 200, 100, 100, 100, 50, 30, 20, 10, 10]
     fe = FeatureEngineering()
     x_ser = fe.read_x_train_features()
     x_ser_clean = fe.read_clean_x_train_features()
     y_mat = fe.read_y_train_features()
-
-    k = 5000
-    x_ser = x_ser.head(k)
-    x_ser_clean = x_ser_clean.head(k)
-    y_mat = y_mat[:k,:]
-
-    def make_ser(cln, ngrams, min_df, max_df):
-        ser = x_ser_clean if cln else x_ser
-        return ser
+    x_ser_test = fe.read_clean_x_test_features()
 
     def get_maker(csv):
-        desc_print = "{}TF-IDF Data; max_ngrams:{}, min_df: {}, max_df: {}"
-        desc_csv = "{}TF-IDF Data, {}, {}, {}"
+        desc_print = "{}TF-IDF Data; min_ngrams:{}, max_ngrams:{}, min_df: {}, max_df: {}"
+        desc_csv = "{}TF-IDF Data, {}, {}, {}, {}, {}"
         desc = desc_csv if csv else desc_print
 
-        make_tup = lambda x: (make_ser(*x), desc.format(*x), *x)
+        def make_tup(x):
+            x = list(x)
+            min_ngrams, max_ngrams = x[1]
+            x[1] = min_ngrams
+            x.insert(2, max_ngrams)
+            return (x_ser_clean, desc.format(*x), *x)
+
         return make_tup
 
-    csv = True
-    if csv: print("data, max_ngrams, min_df, max_df, model, predictor, accuracy, precision, recall, f1, boot_acc")
+    if csv: print("data, min_ngrams, max_ngrams, min_df, max_df, model, predictor, k, accuracy, precision, recall, f1, boot_acc")
     
-    params = itertools.product(cln, ngrams, min_df, max_df)
+    # ngrams = itertools.combinations(ngrams, 2)
+    ngrams = [(1, i) for i in ngrams]
+    params = itertools.product(cln, ngrams, min_df, max_df, range(len(K)-1, -1, -1))
 
-    for x, dat, cln, ngrams, min_df, max_df in map(get_maker(csv), params):
+    tups = list(map(get_maker(csv), params))
+    n = len(tups)
+    start = time.time()
+    i = 1
+    for tup in tups:
+        x, dat, cln, min_ngrams, max_ngrams, min_df, max_df, j = tup
 
-        tfidf = TfidfVectorizer(analyzer='word', ngram_range=(1, ngrams), min_df=min_df, max_df=max_df)
-        x_mat = tfidf.fit_transform(x_ser_clean)
+        k = K[j]
+        n_samp = nsamp[j]
+        x_ser = x_ser.head(k)
+        x_ser_clean = x_ser_clean.head(k)
+        y_mat = y_mat[:k,:]
+        print("Starting {}...".format(dat), file=sys.stderr, flush=True, end='')
+
+        tfidf = TfidfVectorizer(analyzer='word', ngram_range=(min_ngrams, max_ngrams), min_df=min_df, max_df=max_df, norm='l2')
+        # count = CountVectorizer(analyzer='word', ngram_range=(min_ngrams, max_ngrams), min_df=min_df, max_df=max_df)
+        try:
+            x_mat = tfidf.fit_transform(x_ser_clean)
+            # count.fit(x_ser_clean)
+            # x_mat_train = count.transform(x_ser_clean)
+            # x_mat_test = tfidf.transform(x_ser_test)
+        except ValueError as e:
+            continue
 
         if not csv: print("\n{}:".format(dat))
 
         models = [WCNB(preproc=None)]
-        bootstrap = Bootstrap(x_mat, y_mat, models, num_samples=20)
+        bootstrap = Bootstrap(x_mat, y_mat, models, num_samples=n_samp)
         bootstrap.run()
 
         def prepend(x):
             typ = 'M'
             return [dat, x.name, typ]
+
         if csv:
             bootstrap.comma_separated_metrics(prepend=prepend)
         else:
             bootstrap.print_summary()
+
+        finish =time.time()
+        print("Done tup {}/{} in {}".format(i, n, finish-start), file=sys.stderr, flush=True)
+        i += 1
+        start = finish
+
 
 def main():
 
     fullpath = lambda path: os.path.join(find_project_dir(), path)
     loss = lambda y_hat, y: np.vectorize(int)(y_hat==y)
 
-    if True: 
-        sweep(loss)
+    if False: 
+        sweep(loss, csv=True, K=[50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 165000], ngrams=[5], max_df=[0.5])
     else:
         fe = FeatureEngineering()
         # x_ser = fe.read_x_train_features()
@@ -86,7 +151,7 @@ def main():
         # tfidf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0.0001) 
         # x_mat_clean = fe.calc_count_matrix(x_ser_clean)
 
-        print("done preproc")
+        print("done preproc A")
 
         """
         Run bootstrap.
@@ -107,13 +172,46 @@ def main():
         on the data that was used to train the model first, then
         fe.XX.transform(x), where x is a Pandas series.
         """
-        model = WCNB(preproc=TfidfVectorizer(analyzer='word', ngram_range=(1, 2), min_df=0.00001, max_df=0.7) )
-        model.fit(x_ser_clean, y_mat)
-        model.save(fullpath('models/wcnb3'))
-        model = WCNB.load(fullpath('models/wcnb3'))
-        x_test = fe.read_clean_x_test_features()
-        y_hat = model.predict(x_test)
-        pd.DataFrame(y_hat).to_csv(fullpath("models/wcnb3_output.csv"), header=['category'], index_label='id')   
+        preproc=TfidfVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5, norm='l2')
+        # count = CountVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5)
+        k = "1.5.-5.5"
+        x_mat = preproc.fit_transform(x_ser_clean)
+        # print(type(x_mat))
+        # pd.DataFrame(x_mat.toarray()).to_csv(fullpath("models/xmat.csv"), index_label=False)
+        # count.fit(x_ser_clean)
+        print("done preproc B")
+        # model = WCNB()
+        # model.fit(x_mat, y_mat)
+        # model.save(fullpath('models/wcnb{}'.format(k)))
+        model = WCNB.load(fullpath('models/wcnb{}'.format(k)))
+        # model.fit(x_mat, y_mat)
+        # x_test = preproc.transform(fe.read_clean_x_test_features())
+        y_hat = model.predict(x_mat)
+        # pd.DataFrame(y_hat).to_csv(fullpath("models/wcnb{}_output.csv".format(k)), header=['category'], index_label='id')   
+        y = pd.get_dummies(pd.DataFrame(y_mat)).as_matrix()
+
+        y_hat = pd.DataFrame(y_hat)
+        y_hat = pd.get_dummies(y_hat).as_matrix()
+
+        classes = y_hat.shape[1]
+
+        plot_roc_curve(classes, y_hat, y)
+
+        # params = [(5,.5),(5,.6),(5,.7),(5,.4),(6,.5),(6,.7),(7,.3),(7,.6),(8,.7),(8,.8)]
+
+        # for max_ngrams, max_df in params:
+        #     preproc=TfidfVectorizer(analyzer='word', ngram_range=(1, max_ngrams), min_df=0.00001, max_df=max_df, norm='l2')
+        #     k = "1.{}.-5.{}".format(max_ngrams, max_df)
+        #     x_mat = preproc.fit_transform(x_ser_clean)
+        #     print("done preproc B")
+        #     model = WCNB()
+        #     model.fit(x_mat, y_mat)
+        #     model.save(fullpath('models/top10/wcnb{}'.format(k)))
+        #     model = WCNB.load(fullpath('models/top10/wcnb{}'.format(k)))
+        #     x_test = preproc.transform(fe.read_clean_x_test_features())
+        #     y_hat = model.predict(x_test)
+        #     pd.DataFrame(y_hat).to_csv(fullpath("models/top10/wcnb{}_output.csv".format(k)), header=['category'], index_label='id')   
+
 
         # model = NaiveBayes(preproc=count)
         # model.fit(x_mat_clean, y_mat)
