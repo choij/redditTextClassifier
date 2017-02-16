@@ -5,12 +5,48 @@ import itertools
 import time
 import sys
 
-from naive_bayes import NaiveBayes, WCNB
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.metrics import roc_curve, auc
+from matplotlib import pyplot as plt
+
+
+from naive_bayes import NaiveBayes, WCNB
 from FeatureEngineering import FeatureEngineering
 from tools import find_project_dir, parmap
 from bootstrap import Bootstrap
 
+def plot_roc_curve(categories, y_score, y_test):
+    """
+    Plots ROC score
+    :param categories: number of categories
+    :param y_score:
+    :param y_test:
+    :return:
+    """
+
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(categories):
+        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_score.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr[2], tpr[2], color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[2])
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Naive Bayes')
+    plt.legend(loc="lower right")
+    plt.show()
 
 def sweep(loss, csv=True, cln=["Clean "], ngrams=[1, 4, 5, 6, 7], min_df=[0.00001], max_df=[0.5, 0.6, 0.7], K=[]):
 
@@ -92,7 +128,7 @@ def main():
     fullpath = lambda path: os.path.join(find_project_dir(), path)
     loss = lambda y_hat, y: np.vectorize(int)(y_hat==y)
 
-    if True: 
+    if False: 
         sweep(loss, csv=True, K=[50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 165000], ngrams=[5], max_df=[0.5])
     else:
         fe = FeatureEngineering()
@@ -137,18 +173,29 @@ def main():
         fe.XX.transform(x), where x is a Pandas series.
         """
         preproc=TfidfVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5, norm='l2')
-        count = CountVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5)
-        k = "1.5.-5.5_count"
+        # count = CountVectorizer(analyzer='word', ngram_range=(1, 5), min_df=0.00001, max_df=0.5)
+        k = "1.5.-5.5"
         x_mat = preproc.fit_transform(x_ser_clean)
-        count.fit(x_ser_clean)
+        # print(type(x_mat))
+        # pd.DataFrame(x_mat.toarray()).to_csv(fullpath("models/xmat.csv"), index_label=False)
+        # count.fit(x_ser_clean)
         print("done preproc B")
-        model = WCNB()
-        model.fit(x_mat, y_mat)
-        model.save(fullpath('models/wcnb{}'.format(k)))
+        # model = WCNB()
+        # model.fit(x_mat, y_mat)
+        # model.save(fullpath('models/wcnb{}'.format(k)))
         model = WCNB.load(fullpath('models/wcnb{}'.format(k)))
-        x_test = count.transform(fe.read_clean_x_test_features())
-        y_hat = model.predict(x_test)
-        pd.DataFrame(y_hat).to_csv(fullpath("models/wcnb{}_output.csv".format(k)), header=['category'], index_label='id')   
+        # model.fit(x_mat, y_mat)
+        # x_test = preproc.transform(fe.read_clean_x_test_features())
+        y_hat = model.predict(x_mat)
+        # pd.DataFrame(y_hat).to_csv(fullpath("models/wcnb{}_output.csv".format(k)), header=['category'], index_label='id')   
+        y = pd.get_dummies(pd.DataFrame(y_mat)).as_matrix()
+
+        y_hat = pd.DataFrame(y_hat)
+        y_hat = pd.get_dummies(y_hat).as_matrix()
+
+        classes = y_hat.shape[1]
+
+        plot_roc_curve(classes, y_hat, y)
 
         # params = [(5,.5),(5,.6),(5,.7),(5,.4),(6,.5),(6,.7),(7,.3),(7,.6),(8,.7),(8,.8)]
 
